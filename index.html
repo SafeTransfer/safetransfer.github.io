@@ -644,23 +644,56 @@
             }
         }
         
+        // Detect Web3 Provider
+        function detectProvider() {
+            // Check standard window.ethereum
+            if (typeof window.ethereum !== 'undefined') {
+                return window.ethereum;
+            }
+            
+            // Check for specific wallet providers
+            if (typeof window.web3 !== 'undefined' && window.web3.currentProvider) {
+                return window.web3.currentProvider;
+            }
+            
+            return null;
+        }
+        
+        // Get wallet name
+        function getWalletName() {
+            if (!window.ethereum) return 'Unknown';
+            
+            if (window.ethereum.isMetaMask) return 'MetaMask';
+            if (window.ethereum.isImToken) return 'ImToken';
+            if (window.ethereum.isTrust) return 'Trust Wallet';
+            if (window.ethereum.isCoinbaseWallet) return 'Coinbase Wallet';
+            if (window.ethereum.isTokenPocket) return 'TokenPocket';
+            
+            return 'Web3 Wallet';
+        }
+        
         // Connect Wallet
         async function connectWallet() {
-            if (typeof window.ethereum !== 'undefined') {
+            const provider = detectProvider();
+            
+            if (provider) {
                 try {
+                    const walletName = getWalletName();
+                    console.log('Detected wallet:', walletName);
+                    
                     // Request account access
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    const accounts = await provider.request({ method: 'eth_requestAccounts' });
                     account = accounts[0];
                     
                     // Initialize Web3
-                    web3 = new Web3(window.ethereum);
+                    web3 = new Web3(provider);
                     
                     // Update UI
                     document.getElementById('walletAddress').textContent = `Wallet: ${account.substring(0, 6)}...${account.substring(38)}`;
                     document.getElementById('connectWalletBtn').style.display = 'none';
                     
                     // Listen to account changes
-                    window.ethereum.on('accountsChanged', function (accounts) {
+                    provider.on('accountsChanged', function (accounts) {
                         if (accounts.length > 0) {
                             account = accounts[0];
                             document.getElementById('walletAddress').textContent = `Wallet: ${account.substring(0, 6)}...${account.substring(38)}`;
@@ -674,7 +707,7 @@
                     });
                     
                     // Listen to network changes
-                    window.ethereum.on('chainChanged', function (chainId) {
+                    provider.on('chainChanged', function (chainId) {
                         checkNetwork();
                     });
                     
@@ -685,16 +718,17 @@
                     const isMainnet = await checkNetwork();
                     
                     if (isMainnet) {
-                        showStatus('deposit', 'success', 'Wallet connected successfully! Connected to Ethereum Mainnet');
+                        showStatus('deposit', 'success', `✓ ${walletName} connected successfully! Connected to Ethereum Mainnet`);
                     } else {
-                        showStatus('deposit', 'info', 'Wallet connected, but not on Ethereum Mainnet. Please switch network');
+                        showStatus('deposit', 'info', `${walletName} connected, but not on Ethereum Mainnet. Please switch network`);
                     }
                     
                 } catch (error) {
+                    console.error('Failed to connect wallet:', error);
                     alert('Failed to connect wallet: ' + error.message);
                 }
             } else {
-                alert('Please install MetaMask wallet first!');
+                alert('No Web3 wallet detected!\n\nPlease install one of the following wallets:\n• MetaMask\n• ImToken\n• Trust Wallet\n• TokenPocket\n• Coinbase Wallet\n\nOr open this page using the wallet\'s built-in browser.');
             }
         }
         
@@ -705,10 +739,10 @@
                 document.getElementById('walletAddress').innerHTML = `
                     <div style="color: #ffeb3b; font-size: 12px; line-height: 1.5;">
                         ⚠️ Detected file:// protocol<br>
-                        MetaMask does not support opening files directly<br>
+                        Web3 wallets do not support opening files directly<br>
                         Please use a local server<br>
                         Run: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">python3 -m http.server 8000</code><br>
-                        Then visit: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">http://localhost:8000/SafeP2P.html</code>
+                        Then visit: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">http://localhost:8000/index.html</code>
                     </div>
                 `;
                 document.getElementById('connectWalletBtn').textContent = 'Cannot Connect (HTTP Server Required)';
@@ -716,9 +750,14 @@
                 return;
             }
             
-            // Check if already connected
-            if (typeof window.ethereum !== 'undefined') {
-                web3 = new Web3(window.ethereum);
+            // Check if Web3 provider exists
+            const provider = detectProvider();
+            
+            if (provider) {
+                const walletName = getWalletName();
+                console.log('Initialize: Detected wallet -', walletName);
+                
+                web3 = new Web3(provider);
                 
                 // Check if already authorized
                 const accounts = await web3.eth.getAccounts();
@@ -728,7 +767,7 @@
                     document.getElementById('connectWalletBtn').style.display = 'none';
                     
                     // Listen to account changes
-                    window.ethereum.on('accountsChanged', function (accounts) {
+                    provider.on('accountsChanged', function (accounts) {
                         if (accounts.length > 0) {
                             account = accounts[0];
                             document.getElementById('walletAddress').textContent = `Wallet: ${account.substring(0, 6)}...${account.substring(38)}`;
@@ -742,7 +781,7 @@
                     });
                     
                     // Listen to network changes
-                    window.ethereum.on('chainChanged', function (chainId) {
+                    provider.on('chainChanged', function (chainId) {
                         checkNetwork();
                     });
                     
@@ -753,14 +792,14 @@
                     await checkNetwork();
                 }
             } else {
-                // MetaMask not installed
+                // No Web3 wallet detected
                 document.getElementById('walletAddress').innerHTML = `
-                    <div style="color: #ffeb3b; font-size: 12px;">
-                        ⚠️ MetaMask Not Detected<br>
-                        Please install MetaMask browser extension
+                    <div style="color: #ffeb3b; font-size: 12px; line-height: 1.5;">
+                        ⚠️ No Web3 Wallet Detected<br>
+                        Please install a wallet or use wallet's built-in browser
                     </div>
                 `;
-                document.getElementById('connectWalletBtn').textContent = 'Please Install MetaMask';
+                document.getElementById('connectWalletBtn').textContent = 'Please Install Web3 Wallet';
                 document.getElementById('connectWalletBtn').disabled = true;
             }
         }
